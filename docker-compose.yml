@@ -1,0 +1,68 @@
+version: '3'
+
+services:
+
+  zookeeper:
+    container_name: kafka_zookeeper
+    image: wurstmeister/zookeeper
+    ports:
+      - "2181:2181"
+    networks:
+        - application
+
+  kafka-server:
+    container_name: kafka_server
+    image: wurstmeister/kafka:latest
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: 127.0.0.1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CREATE_TOPICS: "defaultTopic:1:1,defaultTopic2:1:1,defaultTopic2:1:1"
+      KAFKA_DELETE_TOPIC_ENABLE: "false"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+        - application
+
+
+  postgres:
+    container_name: postgres_go
+    image: postgres
+    ports:
+      - "5432:5432"
+    volumes: 
+      - dbdata:/var/lib/postgresql/data  
+    networks:
+        - application
+
+  server-api:
+    container_name: server_api
+    #image: 
+    build: .
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres  
+        # condition: service_healthy
+    networks:
+        - application
+
+  worker-api:
+    container_name: worker_api
+    build:
+        context: .
+        dockerfile: ./Dockerfile_worker
+    depends_on:
+        - server-api
+        - kafka-server
+        - zookeeper
+    networks:
+        - application
+
+networks:
+  application:
+    driver: bridge
+
+volumes:
+  dbdata:
